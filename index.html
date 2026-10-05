@@ -25,8 +25,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 "Source Sans 
 .wrap{max-width:820px;margin:0 auto;padding-bottom:calc(48px + env(safe-area-inset-bottom,0px))}
 .top{background:var(--navy);color:#fff;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:calc(14px + env(safe-area-inset-top,0px)) 16px 12px;border-bottom:4px double rgba(255,255,255,.45)}
 .o1{font:700 20px/1.2 "Source Serif 4",Georgia,serif}.o2{font-size:15px;opacity:.9}.ap{font-size:14px;opacity:.85;text-align:right}
-.nav{display:flex;background:var(--card);border-bottom:1px solid var(--line)}
-.nav button{flex:1;font:inherit;font-weight:600;background:none;border:0;border-bottom:3px solid transparent;color:var(--mute);padding:12px 6px;cursor:pointer}
+.nav{display:flex;background:var(--card);border-bottom:1px solid var(--line);overflow-x:auto}
+.nav button{flex:1 0 auto;white-space:nowrap;font:inherit;font-weight:600;background:none;border:0;border-bottom:3px solid transparent;color:var(--mute);padding:12px 6px;cursor:pointer}
 .nav button.on{color:var(--ink);border-bottom-color:var(--ac)}
 .grid{padding:10px 12px 2px;display:grid;gap:6px}
 .gr{display:grid;grid-template-columns:40px repeat(7,1fr);gap:4px}
@@ -104,6 +104,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .modal{position:fixed;z-index:11;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,calc(100% - 32px));max-height:calc(100% - 32px);overflow:auto;background:var(--card);color:var(--ink);border-radius:8px;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
 .modal h2{font:700 22px "Source Serif 4",Georgia,serif;margin:0 0 4px}
 .modal ol{padding-left:22px;margin:10px 0}.modal li{margin:0 0 10px}
+.aviso{background:var(--card);border:1px solid var(--line);border-left:5px solid #b8860b;padding:14px 16px;margin:16px 0;max-width:560px}
+.uc{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--ac);padding:12px 14px;margin:0 0 10px}
+.uc .days{font-size:16px}.uc .af{margin-top:12px}
 .msg{background:var(--warnbg);color:var(--warn);padding:10px 12px;border-radius:4px;max-width:420px}
 </style>
 </head>
@@ -264,14 +267,27 @@ st.shifts={M:['6:00','13:00'],T:['9:00','16:00']};st.exc={};st.v4=1}
 }
 const editing=()=>{const a=document.activeElement;return a&&$('app').contains(a)&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)};
 function remoto(p){const r=p.new;if(!r||!r.datos||(r.actualizado_por||'').startsWith(CID)||tmr)return;st=r.datos;prep();keep();if(editing())pend=true;else render();setSync('Actualizado desde otro dispositivo')}
+const SECC=[['dia','Hoy y pedidos del día'],['historial','Historial'],['proveedores','Proveedores'],['personal','Personal']];
+let perfil=null,usuarios=[],selP={};
+const cachePerfil=v=>{try{v?localStorage.setItem('economato-perfil',JSON.stringify(v)):localStorage.removeItem('economato-perfil')}catch(e){}};
+const perfilLocal=()=>{try{const v=JSON.parse(localStorage.getItem('economato-perfil')||'null');return v&&user&&v.user_id==user.id?v:null}catch(e){return null}};
+const esAdmin=()=>!!(perfil&&perfil.es_admin);
+const puede=k=>auth.step=='local'||esAdmin()||!!(perfil&&(perfil.permisos||[]).includes(k));
+const vistas=()=>[['day','dia'],['h','historial'],['p','proveedores'],['q','personal']].filter(x=>puede(x[1])).map(x=>x[0]).concat(esAdmin()?['u']:[]);
+async function cargarUsuarios(){if(!esAdmin())return;const{data,error}=await sb.from('perfiles').select('*').order('creado');if(!error){usuarios=data||[];if(auth.step=='app'&&!editing())render()}}
+async function cambiarPerfil(id,campos){const{error}=await sb.from('perfiles').update(Object.assign({revisado:new Date().toISOString()},campos)).eq('user_id',id);if(error)alert('No se ha podido guardar: '+error.message);await cargarUsuarios()}
 async function boot(){
-  if(canal){sb.removeChannel(canal);canal=null}
-  if(!user){st=null;auth.step='login';render();return}
+  sb.removeAllChannels();canal=null;
+  if(!user){st=null;perfil=null;usuarios=[];auth.step='login';render();return}
   auth.step='cargando';render();
-  const sinRed=()=>{offline=true;st=load()||{sup:seed(),done:{},qty:{}};prep();auth.step='app';render();setSync('Sin conexión: usando la copia de este dispositivo')};
-  let ok;try{ok=await sb.from('usuarios_permitidos').select('email').maybeSingle()}catch(x){ok={error:x}}
-  if(ok.error)return sinRed();
-  if(!ok.data){auth={step:'denegado',msg:''};render();return}
+  const sinRed=()=>{offline=true;perfil=perfilLocal();if(!perfil||perfil.estado!='aceptado'){auth.step='espera';render();return}st=load()||{sup:seed(),done:{},qty:{}};prep();auth.step='app';render();setSync('Sin conexión: usando la copia de este dispositivo')};
+  let pr;try{pr=await sb.from('perfiles').select('*').eq('user_id',user.id).maybeSingle()}catch(x){pr={error:x}}
+  if(pr.error)return sinRed();
+  perfil=pr.data;cachePerfil(perfil);
+  sb.channel('perfil-'+user.id).on('postgres_changes',{event:'*',schema:'public',table:'perfiles',filter:'user_id=eq.'+user.id},()=>setTimeout(boot,0)).subscribe();
+  if(perfil&&!perfil.nombre){auth.step='nombre';render();return}
+  if(!perfil||perfil.estado!='aceptado'){auth.step=perfil&&perfil.estado=='rechazado'?'rechazado':'espera';render();return}
+  if(esAdmin()){sb.channel('perfiles-todos').on('postgres_changes',{event:'*',schema:'public',table:'perfiles'},()=>cargarUsuarios()).subscribe();cargarUsuarios()}
   let r;try{r=await sb.from('estado').select('datos').eq('id',FILA).maybeSingle()}catch(x){r={error:x}}
   if(r.error)return sinRed();
   offline=false;const data=r.data,local=load();
@@ -352,7 +368,7 @@ function dayPage(){
   const del=(a,id)=>`<button class="rm" data-a="${a}" data-n="${id}">Borrar</button>`;
   const opts=`<option value="d:${m}">Solo el menú ${m} (se repite cada 14 días)</option><option value="d:0">Todos los días</option>`+st.sup.map(s=>`<option value="p:${s.id}">Pedido de ${esc(s.name)}</option>`).join('');
   const blk=s=>`<details class="sup" style="--c:${s.color}"><summary><span class="sn">${esc(s.name)}</span><span class="sx">${esc(s.phone)} · llega el ${DAYS[nx(d)].toLowerCase()}</span><button class="pb" data-a="print" data-s="${s.id}" data-d="${d}">Imprimir</button></summary>${s.items.length?`<table class="tb"><tr><th>Artículo</th><th>Stock</th><th>Nota</th></tr>${s.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(i.stock)}</td><td>${esc(i.note)}</td></tr>`).join('')}</table>`:'<p class="mt" style="padding:0 12px">Sin artículos. Añádelos en Proveedores.</p>'}</details>`;
-  return `<div class="dt">${DAYS[d]}, ${date.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</div><div class="dmenu">Semana ${w} · Menú ${m}${isT?'<span class="today">Hoy</span>':''}</div>`+staffHtml(date,isT)+
+  return `<div class="dt">${DAYS[d]}, ${date.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</div><div class="dmenu">Semana ${w} · Menú ${m}${isT?'<span class="today">Hoy</span>':''}</div>`+(puede('personal')?staffHtml(date,isT):'')+
   `<section class="sec"><h2>Anotaciones del día anterior</h2>${prev.length?prev.map(n=>`<div class="ln"><label><input type="checkbox" data-a="nchk" data-n="${n.id}" ${n.done?'checked':''}><span class="${n.done?'dn':''}">${esc(n.text)}</span></label>${del('delX',n.id)}</div>`).join(''):'<p class="mt">No hay anotaciones para este día.</p>'}</section>`+
   `<section class="sec"><h2>Recordatorios</h2>${rem.map(n=>`<div class="ln"><span>${esc(n.text)}<small>${esc(noteTag(n))}</small></span>${del('delN',n.id)}</div>`).join('')||'<p class="mt">Sin recordatorios para este día.</p>'}<div class="af"><input id="nt" placeholder="Nuevo recordatorio" aria-label="Nuevo recordatorio"><select id="nw" aria-label="Aplicar a">${opts}</select><button class="btn" data-a="addN">Añadir</button></div></section>`+
   `<section class="sec"><h2>Pedidos que hay que hacer${ped.length?' ('+ped.length+')':''}</h2>${ped.length?`<div class="tl"><button class="btn" data-a="print" data-d="${d}">Imprimir todos los pedidos</button></div>`+ped.map(blk).join(''):'<p class="mt">No hay pedidos programados para este día.</p>'}</section>`+
@@ -363,17 +379,37 @@ function dayPage(){
 function shell(){
   const cell=(w,d)=>`<button class="cell ${view=='day'&&sel==d&&wsel==w?'on':''} ${w==cw&&d==td?'td':''}" data-a="day" data-d="${d}" data-w="${w}" aria-label="${DAYS[d]}, menú ${menuN(w,d)}">${DAYS[d].slice(0,3)}<b>M${menuN(w,d)}</b></button>`;
   const hoy=view=='day'&&sel==td&&wsel==cw;
-  return `<header class="top"><div><div class="o1">${esc(st.hdr.a)}</div><div class="o2">${esc(st.hdr.b)}${st.hdr.c?' · '+esc(st.hdr.c):''}</div></div><div class="ap">Economato${instBtn()}${user?`<div class="ac">${esc(user.email)} · <span id="sync">${esc(syncT)}</span></div><button class="pb sal" data-a="logout">Salir</button>`:''}</div></header>
-  <nav class="nav">${[['today','Hoy'],['h','Historial'],['p','Proveedores'],['q','Personal']].map(([k,l])=>`<button class="${(k=='today'?hoy:k==view)?'on':''}" data-a="go" data-v="${k}">${l}</button>`).join('')}</nav>
-  <div class="grid">${[1,2].map(w=>`<div class="gr"><span class="gl">Sem. ${w}</span>${[1,2,3,4,5,6,7].map(d=>cell(w,d)).join('')}</div>`).join('')}</div>`;
+  const cab=`<header class="top"><div><div class="o1">${esc(st.hdr.a)}</div><div class="o2">${esc(st.hdr.b)}${st.hdr.c?' · '+esc(st.hdr.c):''}</div></div><div class="ap">Economato${instBtn()}${user?`<div class="ac">${esc(perfil&&perfil.nombre||user.email)} · <span id="sync">${esc(syncT)}</span></div><button class="pb sal" data-a="logout">Salir</button>`:''}</div></header>`;
+  const V=vistas(),esp=usuarios.filter(u=>u.estado=='pendiente').length;
+  const tabs=[['today','Hoy','day'],['h','Historial','h'],['p','Proveedores','p'],['q','Personal','q'],['u','Usuarios'+(esp?' ('+esp+')':''),'u']].filter(x=>V.includes(x[2]));
+  return `${cab}${tabs.length>1?`<nav class="nav">${tabs.map(([k,l])=>`<button class="${(k=='today'?hoy:k==view)?'on':''}" data-a="go" data-v="${k}">${l}</button>`).join('')}</nav>`:''}
+  ${V.includes('day')?`<div class="grid">${[1,2].map(w=>`<div class="gr"><span class="gl">Sem. ${w}</span>${[1,2,3,4,5,6,7].map(d=>cell(w,d)).join('')}</div>`).join('')}</div>`:''}`;
 }
 function loginView(){
   const top=`<header class="top"><div><div class="o1">Economato</div><div class="o2">Pedidos, proveedores y personal</div></div><div class="ap">${instBtn()}</div></header>`;
   if(auth.step=='cargando')return top+'<main class="main"><p class="sub" style="margin-top:24px">Cargando…</p></main>';
-  if(auth.step=='denegado')return top+`<main class="main"><h1>Sin permiso</h1><p class="sub">El correo ${esc(user&&user.email)} no está autorizado para usar esta aplicación. Pide que lo añadan a la lista de usuarios permitidos.</p>${auth.msg?`<p class="msg">${esc(auth.msg)}</p>`:''}<button class="btn" data-a="logout">Salir</button></main>`;
-  return top+`<main class="main"><h1>Entrar</h1><p class="sub">Los datos se guardan en la nube y se comparten entre todos tus dispositivos.</p><form id="login" class="lg"><label class="f">Correo electrónico<input id="le" type="email" autocomplete="email" required></label><label class="f">Contraseña<input id="lp" type="password" autocomplete="current-password" minlength="6" required></label><div class="af" style="padding:14px"><button class="btn" type="submit" data-a="login">Entrar</button><button class="pb" type="submit" data-a="signup">Crear cuenta</button></div></form>${auth.msg?`<p class="msg" role="status">${esc(auth.msg)}</p>`:''}</main>`;
+  const quien=perfil&&perfil.nombre?perfil.nombre:(user&&user.email)||'';
+  if(auth.step=='nombre')return top+`<main class="main"><h1>¿Cómo te llamas?</h1><p class="sub">Escribe tu nombre para que el administrador sepa quién eres.</p><form id="fnombre" class="lg"><label class="f">Nombre y apellidos<input id="nn2" autocomplete="name" required></label><div class="af" style="padding:14px"><button class="btn" type="submit">Guardar</button><button class="pb" type="button" data-a="logout">Salir</button></div></form>${auth.msg?`<p class="msg" role="status">${esc(auth.msg)}</p>`:''}</main>`;
+  if(auth.step=='espera')return top+`<main class="main"><h1>¡Bienvenido/a a Economato!</h1><p class="sub">Hola, ${esc(quien)}. Tu cuenta se ha creado correctamente.</p><div class="aviso"><b>Tu acceso está en espera.</b><br>El administrador tiene que aceptarte y elegir a qué partes de la aplicación puedes entrar. Cuando lo haga, esta pantalla cambiará sola.</div><div class="af"><button class="btn" data-a="recheck">Comprobar de nuevo</button><button class="pb" data-a="logout">Salir</button></div></main>`;
+  if(auth.step=='rechazado')return top+`<main class="main"><h1>Acceso no disponible</h1><p class="sub">Hola, ${esc(quien)}. El administrador no ha dado acceso a esta cuenta. Si crees que es un error, habla con él.</p><div class="af"><button class="btn" data-a="recheck">Comprobar de nuevo</button><button class="pb" data-a="logout">Salir</button></div></main>`;
+  const reg=auth.modo=='registro';
+  return top+`<main class="main"><h1>${reg?'Crear cuenta':'Entrar'}</h1><p class="sub">${reg?'Rellena tus datos. Después el administrador tendrá que aceptarte.':'Entra con tu correo y tu contraseña.'}</p><form id="login" class="lg" data-m="${reg?'signup':'login'}">${reg?'<label class="f">Nombre y apellidos<input id="ln" autocomplete="name" required></label>':''}<label class="f">Correo electrónico<input id="le" type="email" autocomplete="email" required></label><label class="f">Contraseña${reg?' (mínimo 6 caracteres)':''}<input id="lp" type="password" autocomplete="${reg?'new-password':'current-password'}" minlength="6" required></label><div class="af" style="padding:14px"><button class="btn" type="submit">${reg?'Crear cuenta':'Entrar'}</button></div></form>${auth.msg?`<p class="msg" role="status">${esc(auth.msg)}</p>`:''}<p style="margin-top:18px">${reg?'¿Ya tienes cuenta?':'¿Eres nuevo?'} <button class="pb" data-a="modo">${reg?'Entrar':'Crear una cuenta'}</button></p></main>`;
 }
-function render(){if(auth.step!='app'&&auth.step!='local'){$('app').innerHTML=loginView();return}$('app').innerHTML=shell()+'<main class="main">'+(view=='q'?staffView():view=='h'?histView():view=='p'?supView():dayPage())+'</main>'}
+function render(){if(auth.step!='app'&&auth.step!='local'){$('app').innerHTML=loginView();return}
+  const V=vistas();if(!V.includes(view))view=V[0]||'nada';
+  $('app').innerHTML=shell()+'<main class="main">'+(view=='nada'?'<h1>Sin secciones</h1><p class="sub">Tu cuenta está aceptada, pero el administrador todavía no te ha dado acceso a ninguna parte de la aplicación.</p>':view=='u'?usersView():view=='q'?staffView():view=='h'?histView():view=='p'?supView():dayPage())+'</main>'}
+function usersView(){
+  const fch=t=>t?new Date(t).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):'';
+  const yo=u=>u.user_id==user.id;
+  const quien=u=>`<div><b>${esc(u.nombre||u.email)}</b>${u.nombre?`<div class="sx">${esc(u.email)}</div>`:''}<div class="sx">Se registró el ${fch(u.creado)}</div></div>`;
+  const checks=(u,sel,a,dis)=>`<div class="days">${SECC.map(([k,l])=>`<label><input type="checkbox" data-a="${a}" data-u="${u.user_id}" data-k="${k}" ${sel.includes(k)?'checked':''} ${dis?'disabled':''}>${l}</label>`).join('')}</div>`;
+  const pen=usuarios.filter(u=>u.estado=='pendiente'),ace=usuarios.filter(u=>u.estado=='aceptado'),rec=usuarios.filter(u=>u.estado=='rechazado');
+  const card=(u,body)=>`<div class="uc">${quien(u)}${body}</div>`;
+  return `<h1>Usuarios</h1><p class="sub">Acepta a las personas nuevas y elige a qué partes de la aplicación pueden entrar.</p>
+  <section class="sec"><h2>En espera (${pen.length})</h2>${pen.length?pen.map(u=>card(u,`<div class="f" style="padding:8px 0 0">Podrá entrar en:</div>${checks(u,selP[u.user_id]||(selP[u.user_id]=['dia']),'pperm')}<div class="af"><button class="btn" data-a="uacept" data-u="${u.user_id}">Aceptar</button><button class="rm" data-a="urech" data-u="${u.user_id}">Rechazar</button></div>`)).join(''):'<p class="mt">No hay nadie esperando.</p>'}</section>
+  <section class="sec"><h2>Con acceso (${ace.length})</h2>${ace.map(u=>card(u,u.es_admin?`<p class="mt" style="margin:8px 0 0"><b>Administrador</b>: entra en todo y gestiona los usuarios.${yo(u)?' (Eres tú)':''}</p>${yo(u)?'':`<div class="af"><button class="rm" data-a="unoadm" data-u="${u.user_id}">Quitar permiso de administrador</button></div>`}`:`<div class="f" style="padding:8px 0 0">Puede entrar en (se guarda al marcar):</div>${checks(u,u.permisos||[],'uperm')}<div class="af"><button class="pb" data-a="uadm" data-u="${u.user_id}">Hacer administrador</button><button class="rm" data-a="urech" data-u="${u.user_id}">Quitar el acceso</button></div>`)).join('')}</section>
+  ${rec.length?`<section class="sec"><h2>Sin acceso (${rec.length})</h2>${rec.map(u=>card(u,`<div class="af"><button class="pb" data-a="upend" data-u="${u.user_id}">Volver a poner en espera</button></div>`)).join('')}</section>`:''}`;
+}
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   const a=b.dataset.a,s=st&&find(b.dataset.s);
@@ -381,6 +417,14 @@ document.addEventListener('click',e=>{
   if(a=='cerrarAyuda'){ayuda(false);return}
   if(a=='instalarYa'){if(instE){const ev=instE;ev.prompt();ev.userChoice.then(r=>{if(r.outcome=='accepted'){instE=null;ayuda(false);render()}}).catch(()=>{})}return}
   if(a=='copiar'){const url=location.origin+'/',ok=()=>{b.textContent='Enlace copiado'};if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(ok,()=>prompt('Copia este enlace:',url));else prompt('Copia este enlace:',url);return}
+  if(a=='modo'){auth.modo=auth.modo=='registro'?'entrar':'registro';auth.msg='';render();return}
+  if(a=='recheck'){boot();return}
+  const uid2=b.dataset.u,U=usuarios.find(x=>x.user_id==uid2);
+  if(a=='uacept'&&U){const p=selP[uid2]||['dia'];if(!p.length&&!confirm('No has marcado ninguna sección. ¿Aceptar igualmente?'))return;b.disabled=true;cambiarPerfil(uid2,{estado:'aceptado',permisos:p});return}
+  if(a=='urech'&&U){if(!confirm((U.estado=='pendiente'?'¿Rechazar a ':'¿Quitar el acceso a ')+(U.nombre||U.email)+'?'))return;cambiarPerfil(uid2,{estado:'rechazado',es_admin:false});return}
+  if(a=='upend'&&U){cambiarPerfil(uid2,{estado:'pendiente'});return}
+  if(a=='uadm'&&U){if(!confirm('¿Hacer administrador a '+(U.nombre||U.email)+'? Podrá entrar en todo y aceptar o quitar usuarios.'))return;cambiarPerfil(uid2,{es_admin:true});return}
+  if(a=='unoadm'&&U){cambiarPerfil(uid2,{es_admin:false});return}
   if(a=='logout'){e.preventDefault();if(tmr){clearTimeout(tmr);push()}auth.msg='';sb.auth.signOut();return}
   if(a=='print'){e.preventDefault();$('print').innerHTML=printHtml(b.dataset.s,+b.dataset.d);try{window.print()}catch(x){}return}
   if(a=='go'){const v=b.dataset.v;if(v=='today'){view='day';sel=td;wsel=cw}else view=v;confirmDel=null}
@@ -401,7 +445,10 @@ document.addEventListener('click',e=>{
   save();render();window.scrollTo(0,a=='go'||a=='day'?0:scrollY);
 });
 document.addEventListener('change',e=>{
-  if(!st)return;const t=e.target,a=t.dataset.a,s=find(t.dataset.s);
+  if(!st)return;
+  if(e.target.dataset.a=='pperm'||e.target.dataset.a=='uperm'){const t=e.target,id=t.dataset.u,k=t.dataset.k;
+    if(t.dataset.a=='pperm'){const s=selP[id]||[];selP[id]=t.checked?[...new Set([...s,k])]:s.filter(x=>x!=k);return}
+    const U=usuarios.find(x=>x.user_id==id);if(!U)return;const p=U.permisos||[];cambiarPerfil(id,{permisos:t.checked?[...new Set([...p,k])]:p.filter(x=>x!=k)});return}const t=e.target,a=t.dataset.a,s=find(t.dataset.s);
   if(a=='nchk'){st.next.find(n=>n.id==t.dataset.n).done=t.checked}
   else if(a=='name'&&t.value.trim()){s.name=t.value.trim();open=s.id}
   else if(a=='phone'){s.phone=t.value.trim();open=s.id}
@@ -419,12 +466,15 @@ document.addEventListener('change',e=>{
   save();render();
 });
 document.addEventListener('submit',async e=>{
+  if(e.target.id=='fnombre'){e.preventDefault();const n=$('nn2').value.trim();if(!n)return;e.target.querySelectorAll('button').forEach(x=>x.disabled=true);
+    const{error}=await sb.from('perfiles').update({nombre:n}).eq('user_id',user.id);auth.msg=error?'No se ha podido guardar: '+error.message:'';if(error)render();else boot();return}
   if(e.target.id!='login')return;e.preventDefault();
-  const f=e.target,email=$('le').value.trim(),password=$('lp').value,m=(e.submitter&&e.submitter.dataset.a)||'login';
+  const f=e.target,email=$('le').value.trim(),password=$('lp').value,m=f.dataset.m;
   f.querySelectorAll('button').forEach(x=>x.disabled=true);
-  const r=m=='signup'?await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}}):await sb.auth.signInWithPassword({email,password});
-  if(r.error)auth.msg=r.error.message=='Invalid login credentials'?'Correo o contraseña incorrectos.':r.error.message;
-  else if(m=='signup'&&!r.data.session)auth.msg='Te hemos enviado un correo. Abre el enlace para confirmar la cuenta y después entra aquí.';
+  const r=m=='signup'?await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname,data:{nombre:$('ln').value.trim()}}}):await sb.auth.signInWithPassword({email,password});
+  const ERR={'Invalid login credentials':'Correo o contraseña incorrectos.','Email not confirmed':'Todavía no has confirmado tu correo. Busca el mensaje que te enviamos (mira también en «Correo no deseado») y pulsa el enlace.','User already registered':'Ya existe una cuenta con ese correo. Pulsa «Entrar».'};
+  if(r.error)auth.msg=ERR[r.error.message]||r.error.message;
+  else if(m=='signup'&&!r.data.session){auth.modo='entrar';auth.msg='Te hemos enviado un correo a '+email+'. Ábrelo y pulsa el enlace para confirmar la cuenta (si no lo ves, mira en «Correo no deseado»). Después vuelve aquí y entra con tu correo y contraseña.'}
   else auth.msg='';
   if(auth.step=='login')render();
 });
