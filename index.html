@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pedidos diarios</title>
+<meta name="theme-color" content="#1f3552">
+<meta name="description" content="Pedidos diarios del economato">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/iconos/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/iconos/icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/iconos/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pedidos">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:wght@600;700&display=swap">
 <style>
 :root{--bg:#f3f5f8;--card:#fff;--ink:#1a2330;--mute:#5a6676;--line:#d2d9e2;--navy:#1f3552;--ac:#1f3552;--warn:#7a4b00;--warnbg:#fdf3dc;box-sizing:border-box}
@@ -200,10 +210,17 @@ const CID=uid();
 const load=()=>{try{const r=localStorage.getItem('pedidos-v1');return r?JSON.parse(r):null}catch(e){return null}};
 const keep=()=>{try{localStorage.setItem('pedidos-v1',JSON.stringify(st))}catch(e){}};
 let st=null,user=null,auth={step:sb?'cargando':'local',msg:''},tmr=null,pend=false,canal=null;
-let syncT='';
+let syncT='',instE=null,offline=false,sucio=(()=>{try{return localStorage.getItem('pedidos-sucio')=='1'}catch(e){return false}})();
+const marca=v=>{sucio=v;try{v?localStorage.setItem('pedidos-sucio','1'):localStorage.removeItem('pedidos-sucio')}catch(e){}};
+const esIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform=='MacIntel'&&navigator.maxTouchPoints>1);
+const instalada=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const instBtn=()=>!instalada()&&(instE||esIOS)?'<button class="pb sal" data-a="instalar">Instalar</button> ':'';
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instE=e;render()});
+window.addEventListener('appinstalled',()=>{instE=null;render()});
 const setSync=t=>{syncT=t;const e=$('sync');if(e)e.textContent=t};
-async function push(){tmr=null;const{error}=await sb.from('estado').upsert({id:FILA,datos:st,actualizado:new Date().toISOString(),actualizado_por:CID+' '+user.email});setSync(error?'Error al guardar: '+error.message:'Guardado')}
-const save=()=>{keep();if(!user||!sb)return;clearTimeout(tmr);setSync('Guardando…');tmr=setTimeout(push,600)};
+async function push(){tmr=null;if(!user)return;let error;try{({error}=await sb.from('estado').upsert({id:FILA,datos:st,actualizado:new Date().toISOString(),actualizado_por:CID+' '+user.email}))}catch(x){error=x}
+  if(error){setSync(navigator.onLine===false||offline?'Sin conexión: guardado en este dispositivo, se subirá al volver la conexión':'Error al guardar: '+error.message)}else{marca(false);setSync('Guardado')}}
+const save=()=>{keep();if(!user||!sb)return;marca(true);clearTimeout(tmr);setSync('Guardando…');tmr=setTimeout(push,600)};
 function prep(){
 st.sent=st.sent||{};st.notes=st.notes||[];st.next=st.next||[];st.sup.forEach((s,i)=>{s.color=s.color||PAL[i%PAL.length]});
 if(!st.v2){['Fairy','Vara del Rey','Ahumados Canarios','Hoalve','Almacenes La Losa'].forEach(n=>st.sup.push({id:uid(),name:n,phone:'',days:[],items:[],color:PAL[st.sup.length%PAL.length]}));st.v2=1}
@@ -219,12 +236,15 @@ async function boot(){
   if(canal){sb.removeChannel(canal);canal=null}
   if(!user){st=null;auth.step='login';render();return}
   auth.step='cargando';render();
-  const ok=await sb.from('usuarios_permitidos').select('email').maybeSingle();
-  if(ok.error||!ok.data){auth={step:'denegado',msg:ok.error?ok.error.message:''};render();return}
-  const{data,error}=await sb.from('estado').select('datos').eq('id',FILA).maybeSingle();
-  if(error){st=load()||{sup:seed(),done:{},qty:{}};prep();auth.step='app';render();setSync('Sin conexión: usando la copia de este dispositivo');return}
-  st=data?data.datos:(load()||{sup:seed(),done:{},qty:{}});prep();keep();auth.step='app';render();
-  if(!data){setSync('Guardando…');push()}else setSync('Guardado');
+  const sinRed=()=>{offline=true;st=load()||{sup:seed(),done:{},qty:{}};prep();auth.step='app';render();setSync('Sin conexión: usando la copia de este dispositivo')};
+  let ok;try{ok=await sb.from('usuarios_permitidos').select('email').maybeSingle()}catch(x){ok={error:x}}
+  if(ok.error)return sinRed();
+  if(!ok.data){auth={step:'denegado',msg:''};render();return}
+  let r;try{r=await sb.from('estado').select('datos').eq('id',FILA).maybeSingle()}catch(x){r={error:x}}
+  if(r.error)return sinRed();
+  offline=false;const data=r.data,local=load();
+  st=sucio&&local?local:data?data.datos:(local||{sup:seed(),done:{},qty:{}});prep();keep();auth.step='app';render();
+  if(!data||(sucio&&local)){setSync('Guardando…');push()}else setSync('Guardado');
   canal=sb.channel('estado-'+FILA).on('postgres_changes',{event:'*',schema:'public',table:'estado',filter:'id=eq.'+FILA},remoto).subscribe();
 }
 document.addEventListener('focusout',()=>setTimeout(()=>{if(pend&&!editing()){pend=false;render();setSync('Actualizado desde otro dispositivo')}},0));
@@ -311,7 +331,7 @@ function dayPage(){
 function shell(){
   const cell=(w,d)=>`<button class="cell ${view=='day'&&sel==d&&wsel==w?'on':''} ${w==cw&&d==td?'td':''}" data-a="day" data-d="${d}" data-w="${w}" aria-label="${DAYS[d]}, menú ${menuN(w,d)}">${DAYS[d].slice(0,3)}<b>M${menuN(w,d)}</b></button>`;
   const hoy=view=='day'&&sel==td&&wsel==cw;
-  return `<header class="top"><div><div class="o1">${esc(st.hdr.a)}</div><div class="o2">${esc(st.hdr.b)}${st.hdr.c?' · '+esc(st.hdr.c):''}</div></div><div class="ap">Pedidos diarios${user?`<div class="ac">${esc(user.email)} · <span id="sync">${esc(syncT)}</span></div><button class="pb sal" data-a="logout">Salir</button>`:''}</div></header>
+  return `<header class="top"><div><div class="o1">${esc(st.hdr.a)}</div><div class="o2">${esc(st.hdr.b)}${st.hdr.c?' · '+esc(st.hdr.c):''}</div></div><div class="ap">Pedidos diarios${instBtn()}${user?`<div class="ac">${esc(user.email)} · <span id="sync">${esc(syncT)}</span></div><button class="pb sal" data-a="logout">Salir</button>`:''}</div></header>
   <nav class="nav">${[['today','Hoy'],['h','Historial'],['p','Proveedores'],['q','Personal']].map(([k,l])=>`<button class="${(k=='today'?hoy:k==view)?'on':''}" data-a="go" data-v="${k}">${l}</button>`).join('')}</nav>
   <div class="grid">${[1,2].map(w=>`<div class="gr"><span class="gl">Sem. ${w}</span>${[1,2,3,4,5,6,7].map(d=>cell(w,d)).join('')}</div>`).join('')}</div>`;
 }
@@ -325,6 +345,7 @@ function render(){if(auth.step!='app'&&auth.step!='local'){$('app').innerHTML=lo
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   const a=b.dataset.a,s=st&&find(b.dataset.s);
+  if(a=='instalar'){if(instE){instE.prompt();instE.userChoice.finally(()=>{instE=null;render()})}else alert('Para instalar en iPhone o iPad: abre esta página en Safari, pulsa el botón Compartir y elige «Añadir a pantalla de inicio».');return}
   if(a=='logout'){e.preventDefault();if(tmr){clearTimeout(tmr);push()}auth.msg='';sb.auth.signOut();return}
   if(a=='print'){e.preventDefault();$('print').innerHTML=printHtml(b.dataset.s,+b.dataset.d);try{window.print()}catch(x){}return}
   if(a=='go'){const v=b.dataset.v;if(v=='today'){view='day';sel=td;wsel=cw}else view=v;confirmDel=null}
@@ -372,6 +393,8 @@ document.addEventListener('submit',async e=>{
   else auth.msg='';
   if(auth.step=='login')render();
 });
+window.addEventListener('online',()=>{if(!user)return;if(offline)boot();else if(sucio)push()});
+if('serviceWorker' in navigator&&(location.protocol=='https:'||location.hostname=='localhost'))navigator.serviceWorker.register('/sw.js').catch(()=>{});
 window.addEventListener('afterprint',()=>{$('print').innerHTML=''});
 if(sb)sb.auth.onAuthStateChange((ev,ses)=>{const u=ses?ses.user:null;if(ev=='INITIAL_SESSION'||(u&&u.id)!==(user&&user.id)){user=u;setTimeout(boot,0)}else user=u});
 else{st=load()||{sup:seed(),done:{},qty:{}};prep();keep();render()}
