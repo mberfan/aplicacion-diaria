@@ -1,6 +1,6 @@
 // Copia de la aplicación para que abra sin conexión.
 // La página se pide primero a la red (así llegan las actualizaciones) y, si no hay red, se usa la copia.
-const CACHE = 'pedidos-v1';
+const CACHE = 'economato-v2';
 const BASE = ['/', '/manifest.webmanifest', '/iconos/icono-192.png', '/iconos/icono-512.png', '/iconos/apple-touch-icon.png', '/iconos/favicon-32.png'];
 const FIJOS = ['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 

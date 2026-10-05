@@ -1,6 +1,6 @@
 # aplicacion-diaria
 
-Pedidos diarios del economato: pedidos por proveedor, recordatorios, anotaciones para el día siguiente, personal y rotación de turnos, historial y hojas de pedido imprimibles.
+**Economato**: pedidos diarios por proveedor, recordatorios, anotaciones para el día siguiente, personal y rotación de turnos, historial y hojas de pedido imprimibles.
 
 Es una sola página (`index.html`) sin compilación. Se publica en Vercel directamente desde este repositorio de GitHub: cada cambio subido a `main` se publica solo.
 
