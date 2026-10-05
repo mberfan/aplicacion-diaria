@@ -87,10 +87,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .boss .ph{font-size:20px}
 .boss .ps2{color:#dbe4ef}
 .boss.off{opacity:.85}
+.ac{font-size:12px;opacity:.85;margin-top:2px}
+.sal{color:#fff;border-color:rgba(255,255,255,.6);font-size:13px;padding:3px 10px;margin-top:6px}
+.lg{background:var(--card);border:1px solid var(--line);max-width:420px}
+.msg{background:var(--warnbg);color:var(--warn);padding:10px 12px;border-radius:4px;max-width:420px}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div><div id="print"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <script>
 const DAYS=['','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -189,16 +194,40 @@ Yogur desnatado
 Yogur natural`),
 S('Canalsa','',[1,2,3,4,5],`Verdura congelada`)]}
 const PAL=['#0b6b57','#c2410c','#1d4ed8','#a21caf','#b45309','#be123c','#0e7490','#4d7c0f'];
+const SB_URL='https://duljcoexfofsdeowujzf.supabase.co',SB_KEY='sb_publishable_StG6eSLV6ZmBO81CV2N72A_uFbKDvJx',FILA='principal';
+const sb=window.supabase?window.supabase.createClient(SB_URL,SB_KEY):null;
+const CID=uid();
 const load=()=>{try{const r=localStorage.getItem('pedidos-v1');return r?JSON.parse(r):null}catch(e){return null}};
-const save=()=>{try{localStorage.setItem('pedidos-v1',JSON.stringify(st))}catch(e){}};
-let st=load()||{sup:seed(),done:{},qty:{}};
+const keep=()=>{try{localStorage.setItem('pedidos-v1',JSON.stringify(st))}catch(e){}};
+let st=null,user=null,auth={step:sb?'cargando':'local',msg:''},tmr=null,pend=false,canal=null;
+let syncT='';
+const setSync=t=>{syncT=t;const e=$('sync');if(e)e.textContent=t};
+async function push(){tmr=null;const{error}=await sb.from('estado').upsert({id:FILA,datos:st,actualizado:new Date().toISOString(),actualizado_por:CID+' '+user.email});setSync(error?'Error al guardar: '+error.message:'Guardado')}
+const save=()=>{keep();if(!user||!sb)return;clearTimeout(tmr);setSync('Guardando…');tmr=setTimeout(push,600)};
+function prep(){
 st.sent=st.sent||{};st.notes=st.notes||[];st.next=st.next||[];st.sup.forEach((s,i)=>{s.color=s.color||PAL[i%PAL.length]});
-if(!st.v2){['Fairy','Vara del Rey','Ahumados Canarios','Hoalve','Almacenes La Losa'].forEach(n=>st.sup.push({id:uid(),name:n,phone:'',days:[],items:[],color:PAL[st.sup.length%PAL.length]}));st.v2=1;save()}
+if(!st.v2){['Fairy','Vara del Rey','Ahumados Canarios','Hoalve','Almacenes La Losa'].forEach(n=>st.sup.push({id:uid(),name:n,phone:'',days:[],items:[],color:PAL[st.sup.length%PAL.length]}));st.v2=1}
 st.hdr=st.hdr||{a:'Hospital Universitario de Canarias',b:'Cocina · Economato',c:''};
-if(!st.v3){const v=st.sup.find(s=>/venta nueva/i.test(s.name));if(v)v.pet=true;st.v3=1;save()}
+if(!st.v3){const v=st.sup.find(s=>/venta nueva/i.test(s.name));if(v)v.pet=true;st.v3=1}
 if(!st.v4){const W=(name,role,x)=>Object.assign({id:uid(),name,role,type:'fijo',days:[1,2,3,4,5],from:'6:00',to:'13:00',pos:0},x);
 st.staff=[W('','Jefe del economato',{boss:true}),W('Abel','Auxiliar administrativo',{from:'7:00',to:'14:00'}),W('Javier García Fernández','Personal de economato'),W('Oscar Neider','Personal de economato'),W('Antonio Jesús','Personal de economato',{type:'rota',pos:0}),W('Francisco Plata','Personal de economato',{type:'rota',pos:3}),W('Ani','Personal de economato',{type:'rota',pos:6})];
-st.shifts={M:['6:00','13:00'],T:['9:00','16:00']};st.exc={};st.v4=1;save()}
+st.shifts={M:['6:00','13:00'],T:['9:00','16:00']};st.exc={};st.v4=1}
+}
+const editing=()=>{const a=document.activeElement;return a&&$('app').contains(a)&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)};
+function remoto(p){const r=p.new;if(!r||!r.datos||(r.actualizado_por||'').startsWith(CID)||tmr)return;st=r.datos;prep();keep();if(editing())pend=true;else render();setSync('Actualizado desde otro dispositivo')}
+async function boot(){
+  if(canal){sb.removeChannel(canal);canal=null}
+  if(!user){st=null;auth.step='login';render();return}
+  auth.step='cargando';render();
+  const ok=await sb.from('usuarios_permitidos').select('email').maybeSingle();
+  if(ok.error||!ok.data){auth={step:'denegado',msg:ok.error?ok.error.message:''};render();return}
+  const{data,error}=await sb.from('estado').select('datos').eq('id',FILA).maybeSingle();
+  if(error){st=load()||{sup:seed(),done:{},qty:{}};prep();auth.step='app';render();setSync('Sin conexión: usando la copia de este dispositivo');return}
+  st=data?data.datos:(load()||{sup:seed(),done:{},qty:{}});prep();keep();auth.step='app';render();
+  if(!data){setSync('Guardando…');push()}else setSync('Guardado');
+  canal=sb.channel('estado-'+FILA).on('postgres_changes',{event:'*',schema:'public',table:'estado',filter:'id=eq.'+FILA},remoto).subscribe();
+}
+document.addEventListener('focusout',()=>setTimeout(()=>{if(pend&&!editing()){pend=false;render();setSync('Actualizado desde otro dispositivo')}},0));
 const now=new Date(),dow=now.getDay(),td=dow==0?7:dow;
 const monday=new Date(now.getFullYear(),now.getMonth(),now.getDate()-(td-1));
 const cw=(((Math.round((monday-new Date(2026,9,5))/6048e5))%2)+2)%2==0?2:1;
@@ -282,14 +311,21 @@ function dayPage(){
 function shell(){
   const cell=(w,d)=>`<button class="cell ${view=='day'&&sel==d&&wsel==w?'on':''} ${w==cw&&d==td?'td':''}" data-a="day" data-d="${d}" data-w="${w}" aria-label="${DAYS[d]}, menú ${menuN(w,d)}">${DAYS[d].slice(0,3)}<b>M${menuN(w,d)}</b></button>`;
   const hoy=view=='day'&&sel==td&&wsel==cw;
-  return `<header class="top"><div><div class="o1">${esc(st.hdr.a)}</div><div class="o2">${esc(st.hdr.b)}${st.hdr.c?' · '+esc(st.hdr.c):''}</div></div><div class="ap">Pedidos diarios</div></header>
+  return `<header class="top"><div><div class="o1">${esc(st.hdr.a)}</div><div class="o2">${esc(st.hdr.b)}${st.hdr.c?' · '+esc(st.hdr.c):''}</div></div><div class="ap">Pedidos diarios${user?`<div class="ac">${esc(user.email)} · <span id="sync">${esc(syncT)}</span></div><button class="pb sal" data-a="logout">Salir</button>`:''}</div></header>
   <nav class="nav">${[['today','Hoy'],['h','Historial'],['p','Proveedores'],['q','Personal']].map(([k,l])=>`<button class="${(k=='today'?hoy:k==view)?'on':''}" data-a="go" data-v="${k}">${l}</button>`).join('')}</nav>
   <div class="grid">${[1,2].map(w=>`<div class="gr"><span class="gl">Sem. ${w}</span>${[1,2,3,4,5,6,7].map(d=>cell(w,d)).join('')}</div>`).join('')}</div>`;
 }
-function render(){$('app').innerHTML=shell()+'<main class="main">'+(view=='q'?staffView():view=='h'?histView():view=='p'?supView():dayPage())+'</main>'}
+function loginView(){
+  const top=`<header class="top"><div><div class="o1">Pedidos diarios</div><div class="o2">Economato</div></div></header>`;
+  if(auth.step=='cargando')return top+'<main class="main"><p class="sub" style="margin-top:24px">Cargando…</p></main>';
+  if(auth.step=='denegado')return top+`<main class="main"><h1>Sin permiso</h1><p class="sub">El correo ${esc(user&&user.email)} no está autorizado para usar esta aplicación. Pide que lo añadan a la lista de usuarios permitidos.</p>${auth.msg?`<p class="msg">${esc(auth.msg)}</p>`:''}<button class="btn" data-a="logout">Salir</button></main>`;
+  return top+`<main class="main"><h1>Entrar</h1><p class="sub">Los datos se guardan en la nube y se comparten entre todos tus dispositivos.</p><form id="login" class="lg"><label class="f">Correo electrónico<input id="le" type="email" autocomplete="email" required></label><label class="f">Contraseña<input id="lp" type="password" autocomplete="current-password" minlength="6" required></label><div class="af" style="padding:14px"><button class="btn" type="submit" data-a="login">Entrar</button><button class="pb" type="submit" data-a="signup">Crear cuenta</button></div></form>${auth.msg?`<p class="msg" role="status">${esc(auth.msg)}</p>`:''}</main>`;
+}
+function render(){if(auth.step!='app'&&auth.step!='local'){$('app').innerHTML=loginView();return}$('app').innerHTML=shell()+'<main class="main">'+(view=='q'?staffView():view=='h'?histView():view=='p'?supView():dayPage())+'</main>'}
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
-  const a=b.dataset.a,s=find(b.dataset.s);
+  const a=b.dataset.a,s=st&&find(b.dataset.s);
+  if(a=='logout'){e.preventDefault();if(tmr){clearTimeout(tmr);push()}auth.msg='';sb.auth.signOut();return}
   if(a=='print'){e.preventDefault();$('print').innerHTML=printHtml(b.dataset.s,+b.dataset.d);try{window.print()}catch(x){}return}
   if(a=='go'){const v=b.dataset.v;if(v=='today'){view='day';sel=td;wsel=cw}else view=v;confirmDel=null}
   else if(a=='day'){view='day';sel=+b.dataset.d;wsel=+b.dataset.w}
@@ -309,7 +345,7 @@ document.addEventListener('click',e=>{
   save();render();window.scrollTo(0,a=='go'||a=='day'?0:scrollY);
 });
 document.addEventListener('change',e=>{
-  const t=e.target,a=t.dataset.a,s=find(t.dataset.s);
+  if(!st)return;const t=e.target,a=t.dataset.a,s=find(t.dataset.s);
   if(a=='nchk'){st.next.find(n=>n.id==t.dataset.n).done=t.checked}
   else if(a=='name'&&t.value.trim()){s.name=t.value.trim();open=s.id}
   else if(a=='phone'){s.phone=t.value.trim();open=s.id}
@@ -326,8 +362,19 @@ document.addEventListener('change',e=>{
   else return;
   save();render();
 });
+document.addEventListener('submit',async e=>{
+  if(e.target.id!='login')return;e.preventDefault();
+  const f=e.target,email=$('le').value.trim(),password=$('lp').value,m=(e.submitter&&e.submitter.dataset.a)||'login';
+  f.querySelectorAll('button').forEach(x=>x.disabled=true);
+  const r=m=='signup'?await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}}):await sb.auth.signInWithPassword({email,password});
+  if(r.error)auth.msg=r.error.message=='Invalid login credentials'?'Correo o contraseña incorrectos.':r.error.message;
+  else if(m=='signup'&&!r.data.session)auth.msg='Te hemos enviado un correo. Abre el enlace para confirmar la cuenta y después entra aquí.';
+  else auth.msg='';
+  if(auth.step=='login')render();
+});
 window.addEventListener('afterprint',()=>{$('print').innerHTML=''});
-render();
+if(sb)sb.auth.onAuthStateChange((ev,ses)=>{const u=ses?ses.user:null;if(ev=='INITIAL_SESSION'||(u&&u.id)!==(user&&user.id)){user=u;setTimeout(boot,0)}else user=u});
+else{st=load()||{sup:seed(),done:{},qty:{}};prep();keep();render()}
 </script>
 </body>
 </html>
