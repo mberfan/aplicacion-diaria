@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pedidos diarios</title>
+<title>Economato</title>
 <meta name="theme-color" content="#1f3552">
-<meta name="description" content="Pedidos diarios del economato">
+<meta name="description" content="Economato: pedidos diarios, proveedores, recordatorios y personal">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/iconos/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="/iconos/icono.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/iconos/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Pedidos">
+<meta name="apple-mobile-web-app-title" content="Economato">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:wght@600;700&display=swap">
 <style>
@@ -238,7 +238,7 @@ const GUIA={
   'and-edge':['Android con Edge','',['Pulsa el menú <b>☰</b> (tres rayas) abajo.','Pulsa <b>«Añadir al teléfono»</b> o <b>«Añadir a pantalla de inicio»</b>.','Pulsa <b>«Instalar»</b>.']],
   'and-samsung':['Android con Samsung Internet','',['Pulsa el menú <b>☰</b> (tres rayas) abajo a la derecha.','Pulsa <b>«Añadir página a»</b>.','Elige <b>«Pantalla de inicio»</b> y pulsa <b>«Añadir»</b>.']],
   'and-firefox':['Android con Firefox','',['Pulsa los <b>tres puntos ⋮</b> del menú.','Pulsa <b>«Añadir a pantalla de inicio»</b> o <b>«Instalar»</b>.','Pulsa <b>«Añadir»</b>.']],
-  'pc-chrome':['Ordenador con Chrome','',['Pulsa los <b>tres puntos ⋮</b> arriba a la derecha de Chrome.','Pulsa <b>«Enviar, guardar y compartir»</b> y después <b>«Instalar página como aplicación…»</b> (o directamente <b>«Instalar Pedidos diarios…»</b>).','Pulsa <b>«Instalar»</b>.']],
+  'pc-chrome':['Ordenador con Chrome','',['Pulsa los <b>tres puntos ⋮</b> arriba a la derecha de Chrome.','Pulsa <b>«Enviar, guardar y compartir»</b> y después <b>«Instalar página como aplicación…»</b> (o directamente <b>«Instalar Economato…»</b>).','Pulsa <b>«Instalar»</b>.']],
   'pc-edge':['Ordenador con Edge','',['Pulsa los <b>tres puntos «···»</b> arriba a la derecha de Edge.','Pulsa <b>«Aplicaciones»</b> y después <b>«Instalar este sitio como una aplicación»</b>.','Pulsa <b>«Instalar»</b>.']],
   'mac-safari':['Mac con Safari','',['En el menú de arriba, pulsa <b>Archivo</b>.','Pulsa <b>«Añadir al Dock…»</b>.','Pulsa <b>«Añadir»</b>.']],
   'pc-firefox':['Ordenador con Firefox','Firefox en ordenador no siempre permite instalar aplicaciones web.',['Si a la derecha de la barra de la dirección ves un icono para <b>«Añadir a la barra de tareas»</b>, púlsalo.','Si no está, abre esta misma dirección en <b>Google Chrome</b> o <b>Microsoft Edge</b> y pulsa «Instalar».','Mientras tanto puedes usarla igual desde Firefox: guárdala en marcadores con <b>Ctrl + D</b>.']],
@@ -363,12 +363,12 @@ function dayPage(){
 function shell(){
   const cell=(w,d)=>`<button class="cell ${view=='day'&&sel==d&&wsel==w?'on':''} ${w==cw&&d==td?'td':''}" data-a="day" data-d="${d}" data-w="${w}" aria-label="${DAYS[d]}, menú ${menuN(w,d)}">${DAYS[d].slice(0,3)}<b>M${menuN(w,d)}</b></button>`;
   const hoy=view=='day'&&sel==td&&wsel==cw;
-  return `<header class="top"><div><div class="o1">${esc(st.hdr.a)}</div><div class="o2">${esc(st.hdr.b)}${st.hdr.c?' · '+esc(st.hdr.c):''}</div></div><div class="ap">Pedidos diarios${instBtn()}${user?`<div class="ac">${esc(user.email)} · <span id="sync">${esc(syncT)}</span></div><button class="pb sal" data-a="logout">Salir</button>`:''}</div></header>
+  return `<header class="top"><div><div class="o1">${esc(st.hdr.a)}</div><div class="o2">${esc(st.hdr.b)}${st.hdr.c?' · '+esc(st.hdr.c):''}</div></div><div class="ap">Economato${instBtn()}${user?`<div class="ac">${esc(user.email)} · <span id="sync">${esc(syncT)}</span></div><button class="pb sal" data-a="logout">Salir</button>`:''}</div></header>
   <nav class="nav">${[['today','Hoy'],['h','Historial'],['p','Proveedores'],['q','Personal']].map(([k,l])=>`<button class="${(k=='today'?hoy:k==view)?'on':''}" data-a="go" data-v="${k}">${l}</button>`).join('')}</nav>
   <div class="grid">${[1,2].map(w=>`<div class="gr"><span class="gl">Sem. ${w}</span>${[1,2,3,4,5,6,7].map(d=>cell(w,d)).join('')}</div>`).join('')}</div>`;
 }
 function loginView(){
-  const top=`<header class="top"><div><div class="o1">Pedidos diarios</div><div class="o2">Economato</div></div><div class="ap">${instBtn()}</div></header>`;
+  const top=`<header class="top"><div><div class="o1">Economato</div><div class="o2">Pedidos, proveedores y personal</div></div><div class="ap">${instBtn()}</div></header>`;
   if(auth.step=='cargando')return top+'<main class="main"><p class="sub" style="margin-top:24px">Cargando…</p></main>';
   if(auth.step=='denegado')return top+`<main class="main"><h1>Sin permiso</h1><p class="sub">El correo ${esc(user&&user.email)} no está autorizado para usar esta aplicación. Pide que lo añadan a la lista de usuarios permitidos.</p>${auth.msg?`<p class="msg">${esc(auth.msg)}</p>`:''}<button class="btn" data-a="logout">Salir</button></main>`;
   return top+`<main class="main"><h1>Entrar</h1><p class="sub">Los datos se guardan en la nube y se comparten entre todos tus dispositivos.</p><form id="login" class="lg"><label class="f">Correo electrónico<input id="le" type="email" autocomplete="email" required></label><label class="f">Contraseña<input id="lp" type="password" autocomplete="current-password" minlength="6" required></label><div class="af" style="padding:14px"><button class="btn" type="submit" data-a="login">Entrar</button><button class="pb" type="submit" data-a="signup">Crear cuenta</button></div></form>${auth.msg?`<p class="msg" role="status">${esc(auth.msg)}</p>`:''}</main>`;

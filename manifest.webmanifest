@@ -1,7 +1,7 @@
 {
-  "name": "Pedidos diarios",
-  "short_name": "Pedidos",
-  "description": "Pedidos diarios del economato: proveedores, recordatorios, personal e historial.",
+  "name": "Economato",
+  "short_name": "Economato",
+  "description": "Economato: pedidos diarios, proveedores, recordatorios, personal e historial.",
   "lang": "es",
   "id": "/",
   "start_url": "/",
