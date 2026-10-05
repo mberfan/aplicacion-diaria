@@ -100,11 +100,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .ac{font-size:12px;opacity:.85;margin-top:2px}
 .sal{color:#fff;border-color:rgba(255,255,255,.6);font-size:13px;padding:3px 10px;margin-top:6px}
 .lg{background:var(--card);border:1px solid var(--line);max-width:420px}
+.velo{position:fixed;inset:0;border:0;padding:0;cursor:default;background:rgba(0,0,0,.45);z-index:10}
+.modal{position:fixed;z-index:11;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,calc(100% - 32px));max-height:calc(100% - 32px);overflow:auto;background:var(--card);color:var(--ink);border-radius:8px;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.modal h2{font:700 22px "Source Serif 4",Georgia,serif;margin:0 0 4px}
+.modal ol{padding-left:22px;margin:10px 0}.modal li{margin:0 0 10px}
 .msg{background:var(--warnbg);color:var(--warn);padding:10px 12px;border-radius:4px;max-width:420px}
 </style>
 </head>
 <body>
-<div class="wrap" id="app"></div><div id="print"></div>
+<div class="wrap" id="app"></div><div id="ayuda"></div><div id="print"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <script>
 const DAYS=['','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
@@ -214,9 +218,37 @@ let syncT='',instE=null,offline=false,sucio=(()=>{try{return localStorage.getIte
 const marca=v=>{sucio=v;try{v?localStorage.setItem('pedidos-sucio','1'):localStorage.removeItem('pedidos-sucio')}catch(e){}};
 const esIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform=='MacIntel'&&navigator.maxTouchPoints>1);
 const instalada=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
-const instBtn=()=>!instalada()&&(instE||esIOS)?'<button class="pb sal" data-a="instalar">Instalar</button> ':'';
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instE=e;render()});
-window.addEventListener('appinstalled',()=>{instE=null;render()});
+const instBtn=()=>instalada()?'':'<button class="pb sal" data-a="instalar">Instalar</button> ';
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();instE=e;if($('ayuda').innerHTML)ayuda(true)});
+window.addEventListener('appinstalled',()=>{instE=null;ayuda(false);render()});
+function navegador(){
+  const u=navigator.userAgent,m=/android/i.test(u);
+  if(/FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|Twitter|LinkedInApp|Snapchat|TikTok|musical_ly|GSA\//i.test(u))return 'dentro';
+  if(esIOS)return /CriOS/.test(u)?'ios-chrome':/EdgiOS/.test(u)?'ios-edge':/FxiOS/.test(u)?'ios-firefox':'ios-safari';
+  if(m)return /SamsungBrowser/.test(u)?'and-samsung':/Firefox/.test(u)?'and-firefox':/EdgA/.test(u)?'and-edge':'and-chrome';
+  if(/Edg\//.test(u))return 'pc-edge';if(/Firefox/.test(u))return 'pc-firefox';if(/Chrome|Chromium/.test(u))return 'pc-chrome';if(/Safari/.test(u))return 'mac-safari';return 'otro';
+}
+const GUIA={
+  'dentro':['Estás dentro de otra app','Esta página se ha abierto dentro de otra aplicación (WhatsApp, correo, Instagram…), y desde ahí no se puede instalar.',['Pulsa «Copiar enlace» aquí abajo.','Abre el navegador del teléfono: <b>Safari</b> en iPhone o iPad, <b>Chrome</b> en Android.','Mantén el dedo sobre la barra de la dirección, pulsa <b>«Pegar y abrir»</b> (o «Pegar e ir»).','Vuelve a pulsar «Instalar» y sigue los pasos que te salgan.']],
+  'ios-safari':['iPhone / iPad con Safari','',['Pulsa el botón <b>Compartir</b> (cuadrado con una flecha hacia arriba). Está abajo en el iPhone y arriba en el iPad. Si no lo ves, pulsa primero los <b>tres puntos «···»</b> de abajo a la derecha y después <b>Compartir</b>.','Desliza la lista hacia arriba y pulsa <b>«Añadir a pantalla de inicio»</b>. Si no aparece, pulsa <b>«Ver más»</b> o <b>«Editar acciones…»</b> y búscala allí.','Si aparece la opción <b>«Abrir como app web»</b>, déjala activada.','Pulsa <b>«Añadir»</b> arriba a la derecha.']],
+  'ios-chrome':['iPhone / iPad con Chrome','',['Pulsa el botón <b>Compartir</b> (cuadrado con una flecha hacia arriba) que está <b>arriba a la derecha</b>, en la barra de la dirección. Si no lo ves, pulsa los <b>tres puntos «···»</b> de abajo y después <b>Compartir</b>.','Desliza la lista hacia arriba y pulsa <b>«Añadir a pantalla de inicio»</b>.','Pulsa <b>«Añadir»</b> arriba a la derecha.']],
+  'ios-edge':['iPhone / iPad con Edge','',['Pulsa el menú <b>«···»</b> de abajo en el centro.','Pulsa <b>Compartir</b>.','Pulsa <b>«Añadir a pantalla de inicio»</b> y después <b>«Añadir»</b>.']],
+  'ios-firefox':['iPhone / iPad con Firefox','',['Pulsa el menú <b>☰</b> (tres rayas) abajo a la derecha.','Pulsa <b>Compartir</b>.','Pulsa <b>«Añadir a pantalla de inicio»</b> y después <b>«Añadir»</b>.']],
+  'and-chrome':['Android con Chrome','',['Pulsa los <b>tres puntos ⋮</b> arriba a la derecha.','Pulsa <b>«Instalar aplicación»</b> o <b>«Añadir a pantalla de inicio»</b>.','Pulsa <b>«Instalar»</b>.']],
+  'and-edge':['Android con Edge','',['Pulsa el menú <b>☰</b> (tres rayas) abajo.','Pulsa <b>«Añadir al teléfono»</b> o <b>«Añadir a pantalla de inicio»</b>.','Pulsa <b>«Instalar»</b>.']],
+  'and-samsung':['Android con Samsung Internet','',['Pulsa el menú <b>☰</b> (tres rayas) abajo a la derecha.','Pulsa <b>«Añadir página a»</b>.','Elige <b>«Pantalla de inicio»</b> y pulsa <b>«Añadir»</b>.']],
+  'and-firefox':['Android con Firefox','',['Pulsa los <b>tres puntos ⋮</b> del menú.','Pulsa <b>«Añadir a pantalla de inicio»</b> o <b>«Instalar»</b>.','Pulsa <b>«Añadir»</b>.']],
+  'pc-chrome':['Ordenador con Chrome','',['Pulsa los <b>tres puntos ⋮</b> arriba a la derecha de Chrome.','Pulsa <b>«Enviar, guardar y compartir»</b> y después <b>«Instalar página como aplicación…»</b> (o directamente <b>«Instalar Pedidos diarios…»</b>).','Pulsa <b>«Instalar»</b>.']],
+  'pc-edge':['Ordenador con Edge','',['Pulsa los <b>tres puntos «···»</b> arriba a la derecha de Edge.','Pulsa <b>«Aplicaciones»</b> y después <b>«Instalar este sitio como una aplicación»</b>.','Pulsa <b>«Instalar»</b>.']],
+  'mac-safari':['Mac con Safari','',['En el menú de arriba, pulsa <b>Archivo</b>.','Pulsa <b>«Añadir al Dock…»</b>.','Pulsa <b>«Añadir»</b>.']],
+  'pc-firefox':['Ordenador con Firefox','Firefox en ordenador no siempre permite instalar aplicaciones web.',['Si a la derecha de la barra de la dirección ves un icono para <b>«Añadir a la barra de tareas»</b>, púlsalo.','Si no está, abre esta misma dirección en <b>Google Chrome</b> o <b>Microsoft Edge</b> y pulsa «Instalar».','Mientras tanto puedes usarla igual desde Firefox: guárdala en marcadores con <b>Ctrl + D</b>.']],
+  'otro':['Instalar la aplicación','',['Busca en el menú del navegador la opción <b>«Instalar»</b> o <b>«Añadir a pantalla de inicio»</b>.','Si no existe, abre esta dirección en Chrome, Edge o Safari.']]
+};
+function ayuda(on){
+  const c=$('ayuda');if(!on){c.innerHTML='';return}
+  const k=navegador(),[t,intro,pasos]=GUIA[k];
+  c.innerHTML=`<button class="velo" data-a="cerrarAyuda" aria-label="Cerrar"></button><div class="modal" role="dialog" aria-modal="true" aria-labelledby="ayt"><h2 id="ayt">Instalar la aplicación</h2><p class="mt">${t}</p>${intro?`<p>${intro}</p>`:''}${instE?'<p><button class="btn" data-a="instalarYa">Instalar ahora</button></p><p class="mt">Si no funciona, hazlo a mano:</p>':''}<ol>${pasos.map(x=>`<li>${x}</li>`).join('')}</ol><p class="mt">Dirección: <b>${esc(location.host)}</b></p><div class="af"><button class="pb" data-a="copiar">Copiar enlace</button><button class="btn" data-a="cerrarAyuda">Cerrar</button></div></div>`;
+}
 const setSync=t=>{syncT=t;const e=$('sync');if(e)e.textContent=t};
 async function push(){tmr=null;if(!user)return;let error;try{({error}=await sb.from('estado').upsert({id:FILA,datos:st,actualizado:new Date().toISOString(),actualizado_por:CID+' '+user.email}))}catch(x){error=x}
   if(error){setSync(navigator.onLine===false||offline?'Sin conexión: guardado en este dispositivo, se subirá al volver la conexión':'Error al guardar: '+error.message)}else{marca(false);setSync('Guardado')}}
@@ -336,7 +368,7 @@ function shell(){
   <div class="grid">${[1,2].map(w=>`<div class="gr"><span class="gl">Sem. ${w}</span>${[1,2,3,4,5,6,7].map(d=>cell(w,d)).join('')}</div>`).join('')}</div>`;
 }
 function loginView(){
-  const top=`<header class="top"><div><div class="o1">Pedidos diarios</div><div class="o2">Economato</div></div></header>`;
+  const top=`<header class="top"><div><div class="o1">Pedidos diarios</div><div class="o2">Economato</div></div><div class="ap">${instBtn()}</div></header>`;
   if(auth.step=='cargando')return top+'<main class="main"><p class="sub" style="margin-top:24px">Cargando…</p></main>';
   if(auth.step=='denegado')return top+`<main class="main"><h1>Sin permiso</h1><p class="sub">El correo ${esc(user&&user.email)} no está autorizado para usar esta aplicación. Pide que lo añadan a la lista de usuarios permitidos.</p>${auth.msg?`<p class="msg">${esc(auth.msg)}</p>`:''}<button class="btn" data-a="logout">Salir</button></main>`;
   return top+`<main class="main"><h1>Entrar</h1><p class="sub">Los datos se guardan en la nube y se comparten entre todos tus dispositivos.</p><form id="login" class="lg"><label class="f">Correo electrónico<input id="le" type="email" autocomplete="email" required></label><label class="f">Contraseña<input id="lp" type="password" autocomplete="current-password" minlength="6" required></label><div class="af" style="padding:14px"><button class="btn" type="submit" data-a="login">Entrar</button><button class="pb" type="submit" data-a="signup">Crear cuenta</button></div></form>${auth.msg?`<p class="msg" role="status">${esc(auth.msg)}</p>`:''}</main>`;
@@ -345,7 +377,10 @@ function render(){if(auth.step!='app'&&auth.step!='local'){$('app').innerHTML=lo
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   const a=b.dataset.a,s=st&&find(b.dataset.s);
-  if(a=='instalar'){if(instE){instE.prompt();instE.userChoice.finally(()=>{instE=null;render()})}else alert('Para instalar en iPhone o iPad: abre esta página en Safari, pulsa el botón Compartir y elige «Añadir a pantalla de inicio».');return}
+  if(a=='instalar'){ayuda(true);return}
+  if(a=='cerrarAyuda'){ayuda(false);return}
+  if(a=='instalarYa'){if(instE){const ev=instE;ev.prompt();ev.userChoice.then(r=>{if(r.outcome=='accepted'){instE=null;ayuda(false);render()}}).catch(()=>{})}return}
+  if(a=='copiar'){const url=location.origin+'/',ok=()=>{b.textContent='Enlace copiado'};if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(ok,()=>prompt('Copia este enlace:',url));else prompt('Copia este enlace:',url);return}
   if(a=='logout'){e.preventDefault();if(tmr){clearTimeout(tmr);push()}auth.msg='';sb.auth.signOut();return}
   if(a=='print'){e.preventDefault();$('print').innerHTML=printHtml(b.dataset.s,+b.dataset.d);try{window.print()}catch(x){}return}
   if(a=='go'){const v=b.dataset.v;if(v=='today'){view='day';sel=td;wsel=cw}else view=v;confirmDel=null}
