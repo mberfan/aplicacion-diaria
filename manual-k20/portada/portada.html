@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<link rel="stylesheet" href="fuentes-local.css">
+<style>
+@page{size:A4;margin:0}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:210mm;height:297mm;background:#fff;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{position:relative;width:210mm;height:297mm;overflow:hidden;font-family:Rajdhani,sans-serif}
+.marco{position:absolute;inset:7mm;border:2.2mm solid #000}
+.marco2{position:absolute;inset:11mm;border:.4mm solid #000}
+.rejilla{position:absolute;inset:11mm;background-image:linear-gradient(#e6e6e6 .2mm,transparent .2mm),linear-gradient(90deg,#e6e6e6 .2mm,transparent .2mm);background-size:5mm 5mm}
+.top{position:absolute;left:11mm;right:11mm;top:11mm;height:11mm;background:#000;color:#fff;display:flex;justify-content:space-between;align-items:center;padding:0 5mm;font:700 4.2mm/1 Rajdhani;letter-spacing:1.6mm}
+.c{position:absolute;left:0;right:0;text-align:center}
+.emb{top:33mm}
+.eg{color:#000;-webkit-text-stroke:0;margin-left:5mm;letter-spacing:2mm}
+.honda{top:108mm;font:400 13mm/1 'Russo One';letter-spacing:9mm;padding-left:9mm}
+.civic{top:127mm;font:400 30mm/1 'Russo One';letter-spacing:4mm;padding-left:4mm;color:#fff;-webkit-text-stroke:1.2mm #000}
+.sub{top:105.5mm;font:700 5.2mm/1 Rajdhani;letter-spacing:1.5mm}
+.sub b{background:#000;color:#fff;padding:.8mm 2.5mm;margin:0 1.5mm}
+.banda{position:absolute;left:-6mm;right:-6mm;top:186mm;height:76mm;background:#000;transform:skewY(-4deg)}
+.banda:before,.banda:after{content:"";position:absolute;left:0;right:0;height:1.6mm;background:#fff}
+.banda:before{top:2.4mm}.banda:after{bottom:2.4mm}
+.team{top:192mm;font:400 15mm/1 Anton;letter-spacing:16mm;color:#fff;transform:rotate(-4deg);padding-left:16mm}
+.padilla{top:208mm;font:400 48mm/1.05 Anton;letter-spacing:3mm;color:#fff;transform:rotate(-4deg) skewX(-10deg);padding-left:3mm}
+.coche{top:180mm;left:0;right:0}
+.badges{top:224.5mm;display:flex;justify-content:center;gap:3mm}
+.bd{border:.7mm solid #000;font:700 4.8mm/1 Rajdhani;letter-spacing:1.2mm;padding:1.6mm 3mm 1.2mm}
+.bd.n{background:#000;color:#fff}
+.cap{position:absolute;left:20mm;right:20mm;top:236mm;display:grid;grid-template-columns:1fr 1fr;column-gap:10mm;row-gap:.8mm;font:600 3.6mm/1.1 Rajdhani;letter-spacing:.3mm}
+.cap span{display:flex;gap:2mm;border-bottom:.25mm dotted #000;padding-bottom:.6mm}
+.cap i{font-style:normal;font-weight:700;width:6mm}
+.datos{position:absolute;left:20mm;right:20mm;top:265.5mm;display:grid;grid-template-columns:1.2fr 1fr 1.4fr;gap:5mm;font:700 3.2mm/1 Rajdhani;letter-spacing:.6mm}
+.datos div{border-bottom:.4mm solid #000;padding-bottom:6mm}
+.cuadros{position:absolute;bottom:11mm;left:11mm;right:11mm;height:6mm;background-image:conic-gradient(#000 25%,#fff 0 50%,#000 0 75%,#fff 0);background-size:6mm 6mm}
+.esq{position:absolute;font:700 2.8mm/1 Rajdhani;letter-spacing:.8mm}
+</style></head><body><div class="page">
+<div class="rejilla"></div>
+<div class="marco"></div><div class="marco2"></div>
+<div class="top"><span>MANUAL DE TALLER</span><span>SERVICE MANUAL</span></div>
+
+<!-- Emblema -->
+<div class="c emb"><svg width="92mm" height="68mm" viewBox="0 0 140 104">
+  <path d="M10 6 Q70 -2 130 6 Q138 7 137 15 L126 88 Q125 96 117 97 Q70 104 23 97 Q15 96 14 88 L3 15 Q2 7 10 6 Z" fill="#000"/>
+  <path d="M15 12 Q70 5 125 12 Q131 13 130 19 L120 85 Q119 90 113 91 Q70 97 27 91 Q21 90 20 85 L10 19 Q9 13 15 12 Z" fill="none" stroke="#fff" stroke-width="1.6"/>
+  <path d="M30 20 L46 18.5 L50 46 L90 46 L94 18.5 L110 20 L104 84 L90 85.5 L91 60 L49 60 L50 85.5 L36 84 Z" fill="#fff"/>
+</svg></div>
+
+<div class="c honda">HONDA</div>
+<div class="c civic">CIVIC<span class="eg">EG</span></div>
+
+
+<div class="banda"></div>
+<div class="c team">TEAM</div>
+<div class="c padilla">PADILLA</div>
+
+
+
+
+
+
+<div class="cuadros"></div>
+</div></body></html>
